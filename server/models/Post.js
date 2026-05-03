@@ -12,6 +12,12 @@ const postSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  // Community scope — posts only visible to members of same community
+  community: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Community',
+    default: null,
+  },
   type: {
     type: String,
     enum: ['General', 'Achievement', 'Question', 'Resource'],

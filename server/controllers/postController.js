@@ -1,4 +1,5 @@
 const Post = require('../models/Post');
+const User = require('../models/User');
 
 // @desc  Create a post
 // @route POST /api/posts
@@ -7,8 +8,12 @@ const createPost = async (req, res) => {
     const { content, type } = req.body;
     if (!content?.trim()) return res.status(400).json({ message: 'Content is required' });
 
+    // Get user's community to scope the post
+    const user = await User.findById(req.user._id).select('community');
+
     const post = await Post.create({
       author: req.user._id,
+      community: user?.community || null,
       content: content.trim(),
       type: type || 'General',
     });
@@ -24,20 +29,24 @@ const createPost = async (req, res) => {
 // @route GET /api/posts
 const getPosts = async (req, res) => {
   try {
-    const posts = await Post.find({})
+    // Scope feed to user's community — only posts from same community are shown
+    const currentUser = await User.findById(req.user._id).select('community');
+    const communityFilter = currentUser?.community
+      ? { community: currentUser.community }
+      : { community: null };
+
+    const posts = await Post.find(communityFilter)
       .sort({ createdAt: -1 })
       .limit(50)
       .populate('author', 'name email role')
       .populate('comments.author', 'name email');
 
-    // Increment view count for all posts returned (viewer = current user seeing the feed)
     const postIds = posts
-      .filter(p => p.author?._id?.toString() !== req.user._id.toString()) // don't count own views
+      .filter(p => p.author?._id?.toString() !== req.user._id.toString())
       .map(p => p._id);
 
     if (postIds.length > 0) {
       await Post.updateMany({ _id: { $in: postIds } }, { $inc: { views: 1 } });
-      // Return updated view counts
       const updatedPosts = await Post.find({ _id: { $in: posts.map(p => p._id) } })
         .sort({ createdAt: -1 })
         .populate('author', 'name email role')

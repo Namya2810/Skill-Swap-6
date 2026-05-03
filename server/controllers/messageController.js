@@ -1,9 +1,11 @@
 const Message = require('../models/Message');
 const MentorshipRequest = require('../models/MentorshipRequest');
+const User = require('../models/User');
 
 /**
- * Check if two users have an accepted mentorship connection.
- * Connection exists if any MentorshipRequest between them has status='Accepted'.
+ * Two users can message if:
+ * 1. They have an accepted mentorship connection AND
+ * 2. They are in the same community (community-scoped messaging)
  */
 const isConnected = async (userAId, userBId) => {
   const conn = await MentorshipRequest.findOne({
@@ -13,7 +15,19 @@ const isConnected = async (userAId, userBId) => {
     ],
     status: 'Accepted',
   });
-  return !!conn;
+  if (!conn) return false;
+
+  // Community scope check
+  const [a, b] = await Promise.all([
+    User.findById(userAId).select('community'),
+    User.findById(userBId).select('community'),
+  ]);
+  // If both have communities, they must be the same
+  if (a?.community && b?.community) {
+    return a.community.toString() === b.community.toString();
+  }
+  // If either has no community, allow (legacy users)
+  return true;
 };
 
 // @desc  Send a message (only if connected via accepted mentorship)

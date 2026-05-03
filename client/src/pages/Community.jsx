@@ -186,6 +186,13 @@ export default function Community() {
   const [confirmJoin, setConfirmJoin] = useState(null);
   const [joinMsg, setJoinMsg]       = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  // FIX: track if user has viewed the recommended tab — clears the notification dot
+  const [recommendedViewed, setRecommendedViewed] = useState(false);
+
+  const handleTabChange = (key) => {
+    setTab(key);
+    if (key === 'recommend') setRecommendedViewed(true); // clear dot on view
+  };
 
   const fetchAll = async () => {
     setLoading(true);
@@ -202,6 +209,8 @@ export default function Community() {
       setWeakSuggestions(recRes.data.weakSuggestions || []);
       setCanCreate(recRes.data.canCreate || false);
       setNoStrongMatch(recRes.data.noStrongMatch || false);
+      // Reset viewed state whenever recommendations change (e.g. after profile update)
+      if ((recRes.data.recommendations || []).length > 0) setRecommendedViewed(false);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -277,18 +286,17 @@ export default function Community() {
 
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 22, gap: 2, alignItems: 'flex-end' }}>
-        <button style={tabStyle('mine')} onClick={() => setTab('mine')}>My Community</button>
-        <button style={tabStyle('recommend')} onClick={() => setTab('recommend')}>
+        <button style={tabStyle('mine')} onClick={() => handleTabChange('mine')}>My Community</button>
+        <button style={tabStyle('recommend')} onClick={() => handleTabChange('recommend')}>
           Recommended
-          {recommended.length > 0 && (
+          {/* FIX: only show dot if there are recommendations AND user hasn't viewed yet */}
+          {recommended.length > 0 && !recommendedViewed && (
             <span style={{ marginLeft: 6, background: 'var(--accent)', color: 'white', borderRadius: 99, padding: '1px 7px', fontSize: 11 }}>
               {recommended.length}
             </span>
           )}
         </button>
-        <button style={tabStyle('all')} onClick={() => setTab('all')}>Browse All</button>
-
-        {/* Create button always accessible */}
+        <button style={tabStyle('all')} onClick={() => handleTabChange('all')}>Browse All</button>
         <button
           onClick={() => setShowCreateModal(true)}
           className="btn-primary"
@@ -488,8 +496,15 @@ export default function Community() {
           <div className="card" style={{ maxWidth: 400, width: '100%', padding: 28 }}>
             <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 18, color: 'var(--text-white)', marginBottom: 10 }}>Switch Community?</div>
             <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 20 }}>
-              You're currently in <strong style={{ color: 'var(--text-secondary)' }}>{myCommunity?.name}</strong>.
-              Joining <strong style={{ color: 'var(--accent-text)' }}>{confirmJoin.name}</strong> will remove you from your current community.
+              {/* FIX: only show current community name if it's DIFFERENT from the one being joined */}
+              {myCommunity && myCommunity._id !== confirmJoin._id ? (
+                <>
+                  You're currently in <strong style={{ color: 'var(--text-secondary)' }}>{myCommunity.name}</strong>.{' '}
+                  Joining <strong style={{ color: 'var(--accent-text)' }}>{confirmJoin.name}</strong> will remove you from your current community.
+                </>
+              ) : (
+                <>Join <strong style={{ color: 'var(--accent-text)' }}>{confirmJoin.name}</strong>?</>
+              )}
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn-primary" style={{ flex: 1 }} onClick={() => { handleJoin(confirmJoin._id); setConfirmJoin(null); }}>Yes, Switch</button>

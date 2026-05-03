@@ -1,27 +1,24 @@
 const Community = require('../models/Community');
 const User = require('../models/User');
 const { weightedJaccardScore, categoryBonus, roleBonus } = require('./communityScoring');
-const { getDominantCategory } = require('../data/skillCategories');
+const { getDominantCategory, SKILL_CATEGORIES } = require('../data/skillCategories');
 
-// Helper: extract skill name regardless of string or {name,level} object
-const skillName = s => (typeof s === 'string' ? s : s.name || '').toLowerCase().trim();
+const skillName = s => (typeof s === 'string' ? s : s?.name || '').toLowerCase().trim();
 
-// ── Thresholds ──────────────────────────────────────────────────────────────
-// FIXED: Was 0.30 — too high. Jaccard on small sets (3-5 skills vs 6-8 tags)
-// rarely exceeds 0.20 even for good matches. Use 0.10 as meaningful threshold.
-// Category alignment (+0.15) and role bonus (+0.05) push good matches above this.
-const STRONG_MATCH_THRESHOLD = 0.08;   // score >= 0.08 → show as recommended
-const BEST_MATCH_THRESHOLD   = 0.35;   // score >= 0.35 → label as "Best Match"
-const LOW_MATCH_LABEL_CUTOFF = 0.03;   // score < 0.03 → "Very low match"
+// ── Thresholds ─────────────────────────────────────────────────────────────
+// Weighted Jaccard + bonuses can produce 0–1.35
+// A score of 0.12 means at least 1 shared skill in a small set → meaningful
+const STRONG_MATCH_THRESHOLD = 0.12;
+const BEST_MATCH_THRESHOLD   = 0.40;
 
 // @desc  Get current user's community + members
-// @route GET /api/community
 const getMyCommunity = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).populate('community');
     if (!user.community) return res.json({ community: null, members: [] });
 
-    const community = await Community.findById(user.community._id).populate('members', '-password');
+    const community = await Community.findById(user.community._id)
+      .populate('members', '-password');
     if (!community) {
       await User.findByIdAndUpdate(req.user._id, { $unset: { community: 1 } });
       return res.json({ community: null, members: [] });
@@ -42,34 +39,26 @@ const getMyCommunity = async (req, res) => {
 };
 
 // @desc  Get all communities
-// @route GET /api/community/all
 const getAllCommunities = async (req, res) => {
   try {
-    const communities = await Community.find({}).populate('members', 'name role skillsOffered skillsWanted');
+    const communities = await Community.find({})
+      .populate('members', 'name role skillsOffered skillsWanted');
     res.json(communities);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
-// @desc  Get top 3 recommended communities for current user (threshold-filtered)
-// @route GET /api/community/recommend
+// @desc  Get recommended communities (above threshold only)
 const getRecommendedCommunities = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-
-    // Normalise skill lists
     const offeredNames = (user.skillsOffered || []).map(skillName).filter(Boolean);
     const wantedNames  = (user.skillsWanted  || []).map(skillName).filter(Boolean);
     const allSkills    = [...offeredNames, ...wantedNames];
 
     if (allSkills.length === 0) {
-      return res.json({
-        recommendations: [],
-        canCreate: false,
-        noSkills: true,
-        message: 'Add skills to your profile first',
-      });
+      return res.json({ recommendations: [], canCreate: false, noSkills: true });
     }
 
     const communities = await Community.find({}).populate('members', 'role');
@@ -77,44 +66,27 @@ const getRecommendedCommunities = async (req, res) => {
 
     for (const comm of communities) {
       const commTagsLower = (comm.tags || []).map(t => t.toLowerCase().trim());
-      const commTagSet = new Set(commTagsLower);
+      const commTagSet    = new Set(commTagsLower);
 
-      // ── Score computation ──────────────────────────────────────────
       let score = weightedJaccardScore(offeredNames, wantedNames, commTagsLower);
       score += categoryBonus(allSkills, commTagsLower);
       score += await roleBonus(user.role, comm.members);
       score = parseFloat(score.toFixed(4));
 
-      // DEBUG: log score so developers can verify Jaccard calculation
-      console.log(`[Community scoring] "${comm.name}" → score=${score.toFixed(4)} | userSkills=${JSON.stringify(allSkills.slice(0,4))} | commTags=${JSON.stringify(commTagsLower.slice(0,4))}`);
-
-      // ── Similarity chips (why this match?) ───────────────────────
       const matchedOffered = offeredNames.filter(s => commTagSet.has(s));
-      const matchedWanted  = wantedNames.filter(s => commTagSet.has(s));
-
+      const matchedWanted  = wantedNames.filter(s  => commTagSet.has(s));
       const userCat = getDominantCategory(allSkills);
       const commCat = getDominantCategory(commTagsLower);
-      const categoryAligned = userCat && commCat && userCat === commCat;
-
-      const mentorCount  = comm.members.filter(m => m.role === 'Mentor').length;
-      const learnerCount = comm.members.filter(m => m.role === 'Learner').length;
-      let roleBalanceChip = null;
-      if (user.role === 'Mentor'  && learnerCount > mentorCount)  roleBalanceChip = 'Learner demand ✓';
-      if (user.role === 'Learner' && mentorCount  > learnerCount) roleBalanceChip = 'Mentor demand ✓';
 
       const similarityChips = [];
       matchedOffered.slice(0, 3).forEach(s => similarityChips.push({ label: `${s} ✓`, type: 'skill-offered' }));
-      matchedWanted.slice(0, 2).forEach(s => similarityChips.push({ label: `wants ${s} ✓`, type: 'skill-wanted' }));
-      if (categoryAligned) similarityChips.push({ label: `${userCat} ✓`, type: 'category' });
-      if (roleBalanceChip) similarityChips.push({ label: roleBalanceChip, type: 'role' });
+      matchedWanted.slice(0, 2).forEach(s  => similarityChips.push({ label: `wants ${s} ✓`, type: 'skill-wanted' }));
+      if (userCat && commCat && userCat === commCat) similarityChips.push({ label: `${userCat} ✓`, type: 'category' });
 
-      // ── Threshold-based match quality label ─────────────────────
-      // FIX: don't claim "Best Match" for weak scores
       let matchQuality;
-      if (score >= BEST_MATCH_THRESHOLD)          matchQuality = 'best';
-      else if (score >= STRONG_MATCH_THRESHOLD)   matchQuality = 'strong';
-      else if (score >= LOW_MATCH_LABEL_CUTOFF)   matchQuality = 'weak';
-      else                                        matchQuality = 'none';
+      if (score >= BEST_MATCH_THRESHOLD)        matchQuality = 'best';
+      else if (score >= STRONG_MATCH_THRESHOLD) matchQuality = 'strong';
+      else                                      matchQuality = 'weak';
 
       scored.push({
         _id: comm._id,
@@ -130,17 +102,17 @@ const getRecommendedCommunities = async (req, res) => {
 
     scored.sort((a, b) => b.score - a.score);
 
-    // FIX: Only include communities with a meaningful score (>= threshold)
-    const strongMatches = scored.filter(c => c.score >= STRONG_MATCH_THRESHOLD).slice(0, 3);
+    // Only communities above threshold count as real recommendations
+    const strongMatches = scored
+      .filter(c => c.score >= STRONG_MATCH_THRESHOLD)
+      .slice(0, 3);
 
-    // Decide if user can create a community
-    // canCreate = true when no strong match exists
+    // FIX: canCreate = true only when NO strong match exists
     const canCreate = strongMatches.length === 0;
 
-    // If no strong matches, provide weak suggestions anyway (top 3 regardless) 
-    // but flag them as weak so the UI can handle them differently
-    const weakSuggestions = strongMatches.length === 0
-      ? scored.filter(c => c.score > 0).slice(0, 3)
+    // Weak suggestions (only shown when no strong match found)
+    const weakSuggestions = canCreate
+      ? scored.filter(c => c.score > 0 && c.score < STRONG_MATCH_THRESHOLD).slice(0, 3)
       : [];
 
     res.json({
@@ -148,32 +120,28 @@ const getRecommendedCommunities = async (req, res) => {
       weakSuggestions,
       canCreate,
       noStrongMatch: strongMatches.length === 0,
-      message: strongMatches.length === 0
-        ? 'No strong community match found for your skill set.'
-        : null,
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
-// @desc  User manually joins a recommended community
-// @route PUT /api/community/join
+// @desc  Join a community (with proper switch handling)
 const joinCommunity = async (req, res) => {
   try {
     const { communityId } = req.body;
     if (!communityId) return res.status(400).json({ message: 'communityId required' });
 
-    const user = await User.findById(req.user._id);
+    const user      = await User.findById(req.user._id);
     const community = await Community.findById(communityId);
     if (!community) return res.status(404).json({ message: 'Community not found' });
 
+    // Remove from old community
     if (user.community && user.community.toString() !== communityId) {
       await Community.findByIdAndUpdate(user.community, { $pull: { members: user._id } });
     }
 
-    const memberIds = community.members.map(m => m.toString());
-    if (!memberIds.includes(user._id.toString())) {
+    if (!community.members.map(m => m.toString()).includes(user._id.toString())) {
       community.members.push(user._id);
       await community.save();
     }
@@ -188,8 +156,7 @@ const joinCommunity = async (req, res) => {
   }
 };
 
-// @desc  Create a new community — triggered when no strong match exists
-// @route POST /api/community/create
+// @desc  Create community (only when canCreate is true — no strong match)
 const createCommunity = async (req, res) => {
   try {
     const { name } = req.body;
@@ -200,26 +167,20 @@ const createCommunity = async (req, res) => {
     const wantedNames  = (user.skillsWanted  || []).map(skillName).filter(Boolean);
     const allSkills    = [...new Set([...offeredNames, ...wantedNames])];
 
-    if (allSkills.length === 0) {
+    if (allSkills.length === 0)
       return res.status(400).json({ message: 'Add skills to your profile before creating a community' });
-    }
 
-    const existing = await Community.findOne({ name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } });
+    const existing = await Community.findOne({
+      name: { $regex: new RegExp(`^${name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    });
     if (existing) return res.status(400).json({ message: 'A community with this name already exists' });
 
-    // Generate broad tags: user skills + category keywords so future users match in
-    // This is why React + Python in same community is CORRECT — both map to the same user
-    const { SKILL_CATEGORIES, getDominantCategory } = require('../data/skillCategories');
+    // Build broad tag set: user skills + top skills from dominant category
     const dominantCat = getDominantCategory(allSkills);
+    const categoryTags = dominantCat && SKILL_CATEGORIES[dominantCat]
+      ? SKILL_CATEGORIES[dominantCat].slice(0, 5)
+      : [];
 
-    // Pull up to 4 representative skills from dominant category
-    let categoryTags = [];
-    if (dominantCat && SKILL_CATEGORIES[dominantCat]) {
-      // Pick the most common skills from that category as additional tags
-      categoryTags = SKILL_CATEGORIES[dominantCat].slice(0, 4);
-    }
-
-    // Final tags: actual user skills (higher weight in matching) + category context
     const autoTags = [...new Set([
       ...offeredNames.slice(0, 5),
       ...wantedNames.slice(0, 3),
@@ -239,12 +200,7 @@ const createCommunity = async (req, res) => {
     await user.save();
 
     res.status(201).json({
-      community: {
-        _id: community._id,
-        name: community.name,
-        tags: community.tags,
-        memberCount: 1,
-      },
+      community: { _id: community._id, name: community.name, tags: community.tags, memberCount: 1 },
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });

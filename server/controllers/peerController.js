@@ -75,7 +75,14 @@ const computePeerScore = (me, other) => {
 const getRecommendations = async (req, res) => {
   try {
     const me = await User.findById(req.user._id);
-    const allUsers = await User.find({ _id: { $ne: req.user._id } }).select('-password');
+
+    // Scope peer recommendations to users in the same community (if user has one)
+    // This ensures peer matches are always within community context
+    const peerFilter = me.community
+      ? { _id: { $ne: req.user._id }, community: me.community }
+      : { _id: { $ne: req.user._id } }; // fallback: all users for community-less users
+
+    const allUsers = await User.find(peerFilter).select('-password');
 
     const accepted = await MentorshipRequest.find({
       $or: [{ sender: me._id }, { receiver: me._id }],

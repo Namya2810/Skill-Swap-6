@@ -18,10 +18,12 @@ export default function Messages() {
   const [loading, setLoading]           = useState(true);
   const [sending, setSending]           = useState(false);
   const [error, setError]               = useState('');
-  const [deleteConfirmId, setDeleteConfirmId] = useState(null); // custom delete modal
-  const [attachToast, setAttachToast]   = useState(false);      // attach info toast
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);   // { dataUrl, name }
+  const [imageError, setImageError]     = useState('');
   const messagesEndRef = useRef(null);
   const pollRef        = useRef(null);
+  const fileInputRef   = useRef(null);
 
   useEffect(() => {
     const init = async () => {
@@ -96,13 +98,40 @@ export default function Messages() {
     }, 5000);
   };
 
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImageError('');
+    if (!file.type.startsWith('image/')) {
+      setImageError('Only image files are supported (JPG, PNG, GIF, WebP).');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setImageError('Image must be under 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview({ dataUrl: ev.target.result, name: file.name });
+    reader.readAsDataURL(file);
+    // reset input so same file can be re-selected
+    e.target.value = '';
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!text.trim() || !activeUserId) return;
+    if (!text.trim() && !imagePreview) return;
+    if (!activeUserId) return;
     setSending(true);
     setError('');
     try {
-      await sendMessage({ receiverId: activeUserId, text: text.trim() });
+      // If image attached, send it as a special message with base64 embedded
+      if (imagePreview) {
+        const imgMsg = `[IMAGE:${imagePreview.name}]${imagePreview.dataUrl}`;
+        await sendMessage({ receiverId: activeUserId, text: text.trim() ? `${text.trim()}\n${imgMsg}` : imgMsg });
+        setImagePreview(null);
+      } else {
+        await sendMessage({ receiverId: activeUserId, text: text.trim() });
+      }
       setText('');
       const r = await getConversation(activeUserId);
       setMessages(r.data);
@@ -340,7 +369,26 @@ export default function Messages() {
                           fontSize: 14, lineHeight: 1.55,
                           boxShadow: isMine ? '0 2px 8px rgba(37,99,235,0.25)' : 'none',
                         }}>
-                          {msg.text}
+                          {msg.text.startsWith('[IMAGE:') ? (() => {
+                            const newlineIdx = msg.text.indexOf('\n');
+                            const headerEnd  = msg.text.indexOf(']');
+                            const imgName    = msg.text.slice(7, headerEnd);
+                            const dataUrl    = newlineIdx > -1
+                              ? msg.text.slice(newlineIdx + 1)
+                              : msg.text.slice(headerEnd + 1);
+                            const caption    = newlineIdx > -1
+                              ? msg.text.slice(headerEnd + 1, newlineIdx).trim()
+                              : '';
+                            return (
+                              <div>
+                                {caption && <div style={{ marginBottom: 6, fontSize: 14 }}>{caption}</div>}
+                                <img src={dataUrl} alt={imgName}
+                                  style={{ maxWidth: '100%', maxHeight: 240, borderRadius: 10, display: 'block', cursor: 'pointer' }}
+                                  onClick={() => window.open(dataUrl, '_blank')} />
+                                <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4, fontFamily: 'JetBrains Mono' }}>📷 {imgName}</div>
+                              </div>
+                            );
+                          })() : msg.text}
                         </div>
                         <div style={{
                           fontSize: 10, color: 'var(--text-faint)', marginTop: 4,
@@ -367,28 +415,43 @@ export default function Messages() {
               </div>
 
               {/* Message input */}
-              <form onSubmit={handleSend} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'center' }}>
-                {/* Attachment button */}
-                <button
-                  type="button"
-                  title="Share a file link"
-                  onClick={() => { setAttachToast(true); setTimeout(() => setAttachToast(false), 3500); }}
-                  style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16, flexShrink: 0, transition: 'all 0.15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent-text)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; }}>
-                  📎
-                </button>
-                <input
-                  value={text}
-                  onChange={e => setText(e.target.value)}
-                  placeholder="Type a message..."
-                  className="input"
-                  style={{ flex: 1, padding: '10px 14px' }}
-                  disabled={sending}
-                />
-                <button type="submit" disabled={sending || !text.trim()} className="btn-primary" style={{ padding: '10px 18px', whiteSpace: 'nowrap' }}>
-                  {sending ? '...' : 'Send →'}
-                </button>
+              <form onSubmit={handleSend} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Image preview strip */}
+                {imagePreview && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}>
+                    <img src={imagePreview.dataUrl} alt={imagePreview.name} style={{ height: 48, width: 48, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'JetBrains Mono', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📷 {imagePreview.name}</span>
+                    <button type="button" onClick={() => setImagePreview(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 16, padding: 4 }}>✕</button>
+                  </div>
+                )}
+                {imageError && (
+                  <div style={{ fontSize: 12, color: '#f87171', fontFamily: 'JetBrains Mono', padding: '6px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.1)' }}>{imageError}</div>
+                )}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  {/* Hidden file input */}
+                  <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageSelect} />
+                  {/* Attach button */}
+                  <button
+                    type="button"
+                    title="Attach image"
+                    onClick={() => { setImageError(''); fileInputRef.current?.click(); }}
+                    style={{ background: imagePreview ? 'rgba(59,130,246,0.15)' : 'none', border: `1px solid ${imagePreview ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 10, padding: '10px 12px', cursor: 'pointer', color: imagePreview ? 'var(--accent-text)' : 'var(--text-muted)', fontSize: 16, flexShrink: 0, transition: 'all 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent-text)'; }}
+                    onMouseLeave={e => { if (!imagePreview) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; } }}>
+                    📎
+                  </button>
+                  <input
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    placeholder={imagePreview ? 'Add a caption (optional)...' : 'Type a message...'}
+                    className="input"
+                    style={{ flex: 1, padding: '10px 14px' }}
+                    disabled={sending}
+                  />
+                  <button type="submit" disabled={sending || (!text.trim() && !imagePreview)} className="btn-primary" style={{ padding: '10px 18px', whiteSpace: 'nowrap' }}>
+                    {sending ? '...' : 'Send →'}
+                  </button>
+                </div>
               </form>
             </>
           )}
@@ -411,18 +474,9 @@ export default function Messages() {
         </div>
       )}
 
-      {/* ── Attach toast ── */}
-      {attachToast && (
-        <div style={{ position:'fixed', bottom:28, left:'50%', transform:'translateX(-50%)', zIndex:999, background:'var(--bg-elevated)', border:'1px solid var(--border)', borderRadius:12, padding:'12px 20px', display:'flex', alignItems:'center', gap:10, boxShadow:'0 8px 28px rgba(0,0,0,0.3)', animation:'slideUpFade 0.3s ease both', whiteSpace:'nowrap' }}>
-          <span style={{ fontSize:18 }}>📎</span>
-          <span style={{ fontSize:13, color:'var(--text-secondary)' }}>Paste a <strong style={{ color:'var(--text-white)' }}>Google Drive, Dropbox</strong>, or any file link directly in your message to share resources.</span>
-        </div>
-      )}
-
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeScaleIn { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
-        @keyframes slideUpFade { from{opacity:0;transform:translateX(-50%) translateY(12px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
         .msg-bubble-wrap:hover .msg-delete-btn { opacity: 1 !important; }
       `}</style>
     </Layout>

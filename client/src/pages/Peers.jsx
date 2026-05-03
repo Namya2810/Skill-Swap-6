@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getRecommendations, sendMentorshipRequest, getSessions, endorseSkill } from '../api';
 import Layout from '../components/Layout';
 import SkillTag from '../components/SkillTag';
+import { useAuth } from '../context/AuthContext';
 
 const LEVEL_COLORS = { Beginner: '#fbbf24', Intermediate: '#60a5fa', Advanced: '#34d399' };
 const LEVEL_SYMBOLS = { Beginner: '○', Intermediate: '◑', Advanced: '●' };
@@ -251,12 +252,24 @@ export default function Peers() {
                   <EndorsePanel peer={peer} completedSessions={completedSessions} />
                 </div>
 
-                {/* Action */}
+                {/* Action — show Connect only if peer can teach me something I want to learn */}
                 <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
                   {isConnected ? (
                     <button onClick={() => navigate(`/messages?with=${peer._id}`)} className="btn-primary" style={{ fontSize: 13, padding: '10px 18px', whiteSpace: 'nowrap' }}>✉ Message</button>
                   ) : sentIds.has(peer._id) ? (
                     <button disabled className="btn-primary" style={{ fontSize: 13, padding: '10px 18px', opacity: 0.6, cursor: 'default' }}>⏳ Pending</button>
+                  ) : matchedSkills.length === 0 && canTeach.length > 0 ? (
+                    /* I can teach them but they can't teach me — they should request me */
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', padding: '10px 14px', borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', textAlign: 'center', maxWidth: 170 }}>
+                      <div style={{ fontSize: 15, marginBottom: 4 }}>📢</div>
+                      They can request you
+                    </div>
+                  ) : matchedSkills.length === 0 ? (
+                    /* No useful skill overlap */
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', padding: '10px 14px', borderRadius: 10, background: 'var(--bg-elevated)', border: '1px solid var(--border)', textAlign: 'center', maxWidth: 170 }}>
+                      <div style={{ fontSize: 15, marginBottom: 4 }}>🤝</div>
+                      Connect via community
+                    </div>
                   ) : expandedId === peer._id ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 210 }}>
                       <textarea rows={2} placeholder="Add a note (optional)..." value={messageMap[peer._id] || ''}

@@ -110,9 +110,24 @@ function MatchBadge({ matchQuality, isFirst }) {
   return null;
 }
 
+function suggestCommunityName(skills) {
+  if (!skills || skills.length === 0) return '';
+  const s = skills.map(x => x.toLowerCase());
+  if (s.some(x => ['python','pytorch','tensorflow','machine learning','deep learning','langchain','pandas','numpy','fastapi'].includes(x))) return 'AI / ML Builders';
+  if (s.some(x => ['react','vue','angular','css','html','typescript','sass','three.js','scss'].includes(x))) return 'Frontend Developers';
+  if (s.some(x => ['node','express','java','mongodb','postgresql','redis','spring','graphql'].includes(x))) return 'Backend Engineers';
+  if (s.some(x => ['unreal engine','unity','c++','game','blender','webgl','opengl'].includes(x))) return 'Game Dev & Graphics';
+  if (s.some(x => ['docker','kubernetes','aws','ci/cd','terraform','linux','devops'].includes(x))) return 'DevOps & Cloud';
+  if (s.some(x => ['cybersecurity','ethical hacking','cryptography','penetration testing','owasp'].includes(x))) return 'Security Community';
+  if (s.some(x => ['react native','flutter','swift','kotlin','android','ios'].includes(x))) return 'Mobile Developers';
+  if (s.some(x => ['sql','tableau','power bi','excel','r','data analysis','analytics'].includes(x))) return 'Data Analytics';
+  const top = skills.slice(0, 2).map(sk => sk.charAt(0).toUpperCase() + sk.slice(1)).join(' & ');
+  return `${top} Community`;
+}
+
 // ── Create Community Modal ────────────────────────────────────────────────
 function CreateCommunityModal({ onClose, onCreated, userSkills }) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(() => suggestCommunityName(userSkills));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 

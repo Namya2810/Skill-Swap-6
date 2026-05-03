@@ -442,6 +442,7 @@ export default function Mentorship() {
   const pendingCount        = received.filter(r => r.status === 'Pending').length;
   const pendingSessionCount = sessions.filter(s => s.host?._id === currentUserId && s.status === 'Pending').length;
   const upcomingSessions    = sessions.filter(s => s.status === 'Accepted');
+  const hasCompletedSession = sessions.some(s => s.status === 'Completed');
 
   const stats = [
     { label: 'Pending Requests',   value: pendingCount,                                                              color: '#f59e0b' },
@@ -501,6 +502,11 @@ export default function Mentorship() {
         <button style={tabStyle('sessions')} onClick={() => setTab('sessions')}>
           Sessions{pendingSessionCount > 0 ? ` (${pendingSessionCount} pending)` : ''}
         </button>
+        {hasCompletedSession && (
+          <button style={tabStyle('feedback')} onClick={() => setTab('feedback')}>
+            Feedback ★
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -531,6 +537,19 @@ export default function Mentorship() {
               />
             ))
           )}
+        </div>
+      ) : tab === 'feedback' ? (
+        <div className="card" style={{ padding: 32, textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 14 }}>★</div>
+          <div style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 18, color: 'var(--text-white)', marginBottom: 8 }}>
+            Give or View Feedback
+          </div>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.7, maxWidth: 380, margin: '0 auto 20px' }}>
+            You have completed sessions — share your experience and see what others said about you.
+          </p>
+          <button onClick={() => navigate('/feedback')} className="btn-primary" style={{ padding: '12px 28px', fontSize: 14 }}>
+            Go to Feedback →
+          </button>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

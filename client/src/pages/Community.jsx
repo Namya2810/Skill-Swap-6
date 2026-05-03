@@ -403,18 +403,34 @@ export default function Community() {
               <p style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'JetBrains Mono', marginBottom: 4 }}>
                 Matched using Jaccard similarity + category alignment + role balance · threshold ≥ 30%
               </p>
-              {recommended.map((comm, i) => (
-                <CommunityCard
-                  key={comm._id}
-                  comm={comm}
-                  isFirst={i === 0}
-                  user={user}
-                  myCommunity={myCommunity}
-                  joining={joining}
-                  onJoin={handleJoin}
-                  onConfirmJoin={setConfirmJoin}
-                />
-              ))}
+              {recommended.map((comm, i) => {
+                const isAlreadyJoined = myCommunity?._id?.toString() === comm._id?.toString();
+                return (
+                  <div key={comm._id}>
+                    {isAlreadyJoined && i === 0 && (
+                      <div style={{
+                        padding: '10px 16px', borderRadius: 10, marginBottom: 8,
+                        background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.04))',
+                        border: '1px solid rgba(16,185,129,0.3)',
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        fontSize: 13, color: '#10b981', fontFamily: 'JetBrains Mono',
+                      }}>
+                        <span>✓</span>
+                        <span>You're already in your best match community!</span>
+                      </div>
+                    )}
+                    <CommunityCard
+                      comm={comm}
+                      isFirst={i === 0}
+                      user={user}
+                      myCommunity={myCommunity}
+                      joining={joining}
+                      onJoin={handleJoin}
+                      onConfirmJoin={setConfirmJoin}
+                    />
+                  </div>
+                );
+              })}
             </>
           )}
 
@@ -561,8 +577,8 @@ function CommunityCard({ comm, isFirst, user, myCommunity, joining, onJoin, onCo
         </div>
 
         <div style={{ flexShrink: 0 }}>
-          {user?.community?._id === comm._id ? (
-            <span style={{ fontSize: 12, color: '#10b981', fontFamily: 'JetBrains Mono', padding: '8px 14px', borderRadius: 99, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>✓ Joined</span>
+          {myCommunity?._id?.toString() === comm._id?.toString() ? (
+            <span style={{ fontSize: 12, color: '#10b981', fontFamily: 'JetBrains Mono', padding: '8px 14px', borderRadius: 99, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>✓ Your Community</span>
           ) : (
             <button
               onClick={() => myCommunity ? onConfirmJoin(comm) : onJoin(comm._id)}

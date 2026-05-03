@@ -8,8 +8,8 @@ const skillName = s => (typeof s === 'string' ? s : s?.name || '').toLowerCase()
 // ── Thresholds ─────────────────────────────────────────────────────────────
 // Weighted Jaccard + bonuses can produce 0–1.35
 // A score of 0.12 means at least 1 shared skill in a small set → meaningful
-const STRONG_MATCH_THRESHOLD = 0.12;
-const BEST_MATCH_THRESHOLD   = 0.40;
+const STRONG_MATCH_THRESHOLD = 0.30;
+const BEST_MATCH_THRESHOLD   = 0.55;
 
 // @desc  Get current user's community + members
 const getMyCommunity = async (req, res) => {

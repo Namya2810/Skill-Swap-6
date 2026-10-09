@@ -151,6 +151,8 @@ EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_app_password
 ```
 
+Optional: `EMAIL_HOST` (default `smtp.gmail.com`), `EMAIL_PORT` (`587`), `EMAIL_FROM` and `CLIENT_URL` (`http://localhost:5173`, used in email links).
+
 ---
 
 ## How the Matching Algorithm Works

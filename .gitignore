@@ -2,3 +2,7 @@ node_modules/
 .env
 dist/
 *.log
+
+# secrets
+.env
+server/.env

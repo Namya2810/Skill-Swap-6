@@ -1,4 +1,4 @@
-// Real Tech Skills Dataset — 500+ skills across 15 categories
+// Real Tech Skills Dataset — about 300 skills across 15 categories
 // Used for autocomplete in skill input fields
 
 export const SKILL_CATEGORIES = {

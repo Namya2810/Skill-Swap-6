@@ -17,7 +17,7 @@
 
 Skill Swap matches people based on what they can teach and what they want to learn. Register as a Mentor, a Learner, or both — the platform automatically places you into the right community and surfaces your best-fit peers using a custom weighted scoring algorithm.
 
-**500+ skills in the dataset · 87% match accuracy · Deployed on Vercel**
+**~300 skills across 15 categories · Two-way peer matching · Deployed on Vercel**
 
 ---
 
@@ -36,7 +36,7 @@ On registration, users are placed into the most suitable community using a **Wei
 ### 📅 Session Booking + Email Reminders
 Request structured learning sessions with any peer. A background **cron job** (runs hourly) automatically sends email reminders at 24h and 1h before each session via Nodemailer.
 
-### 💬 Real-time Messaging
+### 💬 Messaging (auto-refreshes every 5 seconds)
 Direct messages between users with a clean, full-featured messaging UI.
 
 ### ✅ Skill Endorsements
@@ -188,7 +188,7 @@ Users are ranked by total score, and the breakdown (what they can teach you, wha
 
 **Namya Jain** — MCA student at Thapar Institute of Engineering and Technology  
 Minor in AI & ML — IIT Ropar  
-[GitHub](https://github.com/Namya2810) · [LinkedIn](https://linkedin.com/in/YOUR-LINK) · [jainnamya2810@gmail.com](mailto:jainnamya2810@gmail.com)
+[GitHub](https://github.com/Namya2810) · [LinkedIn](https://linkedin.com/in/namya-jain-agfd) · [jainnamya2810@gmail.com](mailto:jainnamya2810@gmail.com)
 
 ---
 

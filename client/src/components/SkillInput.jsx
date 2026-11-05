@@ -211,7 +211,7 @@ export default function SkillInput({ label, skills = [], onChange, variant = 'bl
       )}
 
       <p className="text-xs mt-2 font-mono" style={{ color: '#2d4a70' }}>
-        500+ skills · type to search ·{' '}
+        ~300 skills · type to search ·{' '}
         <span style={{ color: '#fbbf24' }}>○ Beginner</span>{' → '}
         <span style={{ color: '#60a5fa' }}>◑ Intermediate</span>{' → '}
         <span style={{ color: '#34d399' }}>● Advanced</span>

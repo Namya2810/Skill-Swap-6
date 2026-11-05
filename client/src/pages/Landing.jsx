@@ -10,8 +10,8 @@ const FEATURES = [
 ];
 
 const STATS = [
-  { value: '500+', label: 'Skills in dataset' },
-  { value: '87%',  label: 'Match accuracy' },
+  { value: '~300', label: 'Skills in dataset' },
+  { value: '15',   label: 'Skill categories' },
   { value: '∞',    label: 'Connections possible' },
 ];
 

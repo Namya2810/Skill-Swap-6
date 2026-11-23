@@ -1,18 +1,25 @@
 const express = require('express');
-const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 
 dotenv.config();
 connectDB();
 
+// Loaded after dotenv so it can read ALLOWED_ORIGINS / CLIENT_URL
+const { corsMiddleware, authLimiter, apiLimiter } = require('./middleware/security');
+
 const app = express();
 
-app.use(cors());
+// Hosting platforms (Render, Railway, Vercel) sit behind a proxy; trust it so
+// rate limiting sees the real client IP instead of the proxy's IP.
+app.set('trust proxy', 1);
+
+app.use(corsMiddleware);
 app.use(express.json());
+app.use('/api', apiLimiter);
 
 // Routes
-app.use('/api/auth',       require('./routes/authRoutes'));
+app.use('/api/auth',       authLimiter, require('./routes/authRoutes'));
 app.use('/api/users',      require('./routes/userRoutes'));
 app.use('/api/community',  require('./routes/communityRoutes'));
 app.use('/api/peers',      require('./routes/peerRoutes'));

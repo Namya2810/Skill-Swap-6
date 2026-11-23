@@ -151,7 +151,9 @@ EMAIL_USER=your_email@gmail.com
 EMAIL_PASS=your_app_password
 ```
 
-Optional: `EMAIL_HOST` (default `smtp.gmail.com`), `EMAIL_PORT` (`587`), `EMAIL_FROM` and `CLIENT_URL` (`http://localhost:5173`, used in email links).
+Optional: `EMAIL_HOST` (default `smtp.gmail.com`), `EMAIL_PORT` (`587`), `EMAIL_FROM` and `CLIENT_URL` (`http://localhost:5173`, used in email links), `ALLOWED_ORIGINS` (comma-separated sites allowed to call the API via CORS; defaults to `CLIENT_URL`, else the live site + `http://localhost:5173`) and `SESSION_TZ_OFFSET` (`+05:30`, timezone of session times).
+
+Security: login/register are rate-limited to 10 attempts per IP per 15 minutes, and the whole API to 1000 requests per IP per 15 minutes.
 
 ---
 

@@ -5,14 +5,8 @@ const { sendSessionConfirmationEmail } = require('../utils/emailService');
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Parse a session's stored date + time strings into a JS Date.
- * date format: "YYYY-MM-DD"  |  time format: "HH:MM" (24-hr)
- */
-function parseSessionDateTime(date, time = '00:00') {
-  // Build ISO string and parse — avoids timezone surprises from `new Date(date)`
-  return new Date(`${date}T${time}:00`);
-}
+// parseSessionDateTime: date "YYYY-MM-DD" + time "HH:MM" → Date, in the app's timezone
+const { parseSessionDateTime } = require('../utils/sessionTime');
 
 /**
  * Auto-expire any Accepted sessions whose datetime has already passed.

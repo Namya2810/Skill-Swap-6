@@ -42,6 +42,9 @@ const sessionSchema = new mongoose.Schema({
   completedAt: {
     type: Date,
   },
+  // Set by the reminder cron so each reminder email is sent only once
+  reminder24Sent: { type: Boolean, default: false },
+  reminder1Sent:  { type: Boolean, default: false },
 });
 
 module.exports = mongoose.model('Session', sessionSchema);

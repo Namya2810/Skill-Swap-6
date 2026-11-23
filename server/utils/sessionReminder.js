@@ -1,36 +1,39 @@
 /**
  * sessionReminder.js — Cron job that sends email reminders for upcoming sessions
- * Runs every hour, checks for sessions 24h and 1h away (±15 min window).
+ * Runs every 15 minutes. Sends a "24 hours" reminder once the session is
+ * 23–24h away and a "1 hour" reminder once it is 0–1h away. The windows are
+ * wider than the cron interval, so no session (e.g. at 10:30) is ever skipped,
+ * and the reminder24Sent / reminder1Sent flags stop duplicate emails.
  * Import and call startReminderCron() in server/index.js
  */
 const cron = require('node-cron');
 const Session = require('../models/Session');
 const { sendSessionReminderEmail } = require('./emailService');
+const { parseSessionDateTime } = require('./sessionTime');
 
 const startReminderCron = () => {
-  // Run every hour at :00
-  cron.schedule('0 * * * *', async () => {
+  // Run every 15 minutes
+  cron.schedule('*/15 * * * *', async () => {
     console.log('[ReminderCron] Checking for upcoming sessions...');
     try {
       const now = new Date();
 
-      // Fetch all Accepted sessions in the future
-      const sessions = await Session.find({ status: 'Accepted' })
+      // Accepted sessions that still have at least one reminder left to send
+      const sessions = await Session.find({
+        status: 'Accepted',
+        $or: [{ reminder24Sent: { $ne: true } }, { reminder1Sent: { $ne: true } }],
+      })
         .populate('requester', 'name email')
         .populate('host', 'name email');
 
       for (const session of sessions) {
-        // Parse session datetime from date string + time string
-        const sessionDateTime = new Date(`${session.date}T${session.time || '00:00'}`);
+        const sessionDateTime = parseSessionDateTime(session.date, session.time);
         if (isNaN(sessionDateTime)) continue;
 
-        const diffMs = sessionDateTime - now;
-        const diffHours = diffMs / (1000 * 60 * 60);
+        const diffHours = (sessionDateTime - now) / (1000 * 60 * 60);
 
-        // 24h window: 23.75h – 24.25h
-        const is24h = diffHours >= 23.75 && diffHours <= 24.25;
-        // 1h window:  0.75h – 1.25h
-        const is1h  = diffHours >= 0.75  && diffHours <= 1.25;
+        const is1h  = diffHours > 0  && diffHours <= 1  && !session.reminder1Sent;
+        const is24h = diffHours > 23 && diffHours <= 24 && !session.reminder24Sent;
 
         if (!is24h && !is1h) continue;
 
@@ -60,13 +63,19 @@ const startReminderCron = () => {
             ...payload,
           });
         }
+
+        // Mark as sent so the next run doesn't email again
+        await Session.updateOne(
+          { _id: session._id },
+          { $set: is1h ? { reminder1Sent: true } : { reminder24Sent: true } }
+        );
       }
     } catch (err) {
       console.error('[ReminderCron] Error:', err.message);
     }
   });
 
-  console.log('[ReminderCron] Started — checking sessions every hour');
+  console.log('[ReminderCron] Started — checking sessions every 15 minutes');
 };
 
 module.exports = { startReminderCron };

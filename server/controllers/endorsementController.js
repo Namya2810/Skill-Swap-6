@@ -22,6 +22,13 @@ const endorseSkill = async (req, res) => {
     if (!isParticipant)
       return res.status(403).json({ message: 'Not a participant in this session' });
 
+    // The endorsed user must be the OTHER person in this same session
+    const otherUser = session.requester.toString() === uid
+      ? session.host.toString()
+      : session.requester.toString();
+    if (toUserId !== otherUser)
+      return res.status(403).json({ message: 'You can only endorse the other participant of this session' });
+
     const endorsement = await Endorsement.create({
       fromUser: req.user._id,
       toUser:   toUserId,

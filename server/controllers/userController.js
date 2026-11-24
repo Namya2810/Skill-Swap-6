@@ -164,20 +164,4 @@ const getAllUsers = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-const deleteUser = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findById(id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    if (req.user._id.toString() === id) {
-      return res.status(400).json({ message: 'You cannot delete your own account via this endpoint.' });
-    }
-
-    await User.findByIdAndDelete(id);
-    res.json({ message: `User "${user.name}" (${user.email}) deleted successfully.` });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-module.exports = { getProfile, updateProfile, getAllUsers, inferSkillLevels, deleteUser };
+module.exports = { getProfile, updateProfile, getAllUsers, inferSkillLevels };

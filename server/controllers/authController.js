@@ -14,7 +14,9 @@ const toNameArray = (skills) =>
 // @route POST /api/auth/register
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, skillsOffered, skillsWanted, bio } = req.body;
+    const { name, password, role, skillsOffered, skillsWanted, bio } = req.body;
+    // Emails are stored lowercase (User schema), so look them up lowercase too
+    const email = String(req.body.email || '').trim().toLowerCase();
     const userExists = await User.findOne({ email });
     if (userExists) return res.status(400).json({ message: 'User already exists with this email' });
 
@@ -46,7 +48,8 @@ const registerUser = async (req, res) => {
 // @route POST /api/auth/login
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
     const user = await User.findOne({ email }).populate('community', 'name');
     if (!user) return res.status(401).json({ message: 'Invalid email or password' });
     const isMatch = await user.matchPassword(password);
